@@ -1,7 +1,7 @@
-# Database-Sub
+# Database Sub
 
 #### Description
-数据库中数据迁移
+通过自定义的分库分表算法将数据拆分
 
 #### Software Architecture
 Software architecture description
