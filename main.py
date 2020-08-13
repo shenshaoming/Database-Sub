@@ -3,7 +3,6 @@ import yaml
 
 from entity.dataNode import DataNode
 from exceptions.database import TableNotFoundException
-from utils.config import get_redis_client
 from utils.mysql_util import MyConn
 
 j_class = None
@@ -85,6 +84,7 @@ def check_table_exist(database_name, table_name, table_sql):
     else:
         # 创建表
         database_pool_dict[database_name].exec_sql(table_sql % table_name)
+        print("在数据库 %s 中创建表: %s" % (database_name, table_name))
         return False
 
 
@@ -99,8 +99,19 @@ def format_table_sql(create_table_sql, table_name):
     return str(create_table_sql).replace(table_name, "%s", 1)
 
 
-def calculate_sharding(data, sharding_column, sharding_column1):
-    pass
+def calculate_sharding(data, database_sharding_column, table_sharding_column, database_num, table_num):
+    """
+    计算分片键
+    :param data: dict对象， key为列名，value为该列的值
+    :param database_sharding_column: 数据库分片键
+    :param table_sharding_column: 数据表分片键
+    :param database_num: 数据库分片数量
+    :param table_num: 表分片数量
+    :return: 分库名称, 分表名称
+    """
+
+    return get_sharding_index(data[database_sharding_column],
+                              database_num), get_sharding_index(data[table_sharding_column], table_num)
 
 
 def data_transform(tables_dict):
@@ -119,9 +130,6 @@ def data_transform(tables_dict):
         new_database_list = new_dataNode.get_database_list()
         old_table_list = old_dataNode.get_table_list()
         new_table_list = new_dataNode.get_table_list()
-        # 检查当前逻辑表的各个表是否存在
-
-
 
         # 获得表中所有列的描述信息
         rs, column_list = database_pool_dict[old_database_list[0]] \
@@ -137,13 +145,16 @@ def data_transform(tables_dict):
 
         for old_database in old_database_list:
             for old_table in old_table_list:
-
-                rs, column_list = database_pool_dict[old_database]\
-                    .get_rs_with_describe(sql % (old_table, 1))
+                rs = database_pool_dict[old_database].get_result(sql % (old_table, 1))
                 for row in rs:
                     data = parse_obj(row, column_list)
-                    # 计算分片结果
-                    calculate_sharding(data, old_dataNode.sharding_column, new_dataNode.sharding_column)
+                    # 计算分片index
+                    target_database_index, target_table_index = \
+                        calculate_sharding(data, old_dataNode.sharding_column, new_dataNode.sharding_column,
+                                           len(new_database_list), len(new_table_list))
+                    target_database = new_database_list[target_database_index]
+                    target_table = new_table_list[target_table_index]
+                    print("%s.%s => %s.%s" % (old_database, old_table, target_database, target_table))
 
 
 def main():
@@ -179,5 +190,3 @@ if __name__ == '__main__':
         raise e
     finally:
         jpype.shutdownJVM()
-        get_redis_client().close()
-

@@ -4,12 +4,17 @@ dataSources:
     port: 3306
     username: root
     password: chaojimima=123$
+  toyota:
+    idAddress: 127.0.0.1
+    port: 3306
+    username: root
+    password: chaojimima=123$
 shardingRule:
   car_detail:
     old:
-      dataNodes: toyota2.car_detail_${1..6}
+      dataNodes: toyota2.car_detail_${1..16}
       shardingColumn: frame_no
 
     new:
-      dataNodes: toyota2.car_detail_${1..16}
+      dataNodes: toyota.car_detail_${1..6}
       shardingColumn: frame_no

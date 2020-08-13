@@ -5,17 +5,15 @@ def get_sharding_list(string):
     :return: 节点后缀数组
     """
 
-    result_list = []
     if string[2] == '[':
         # 拆取数组
         end = string.rindex("]")
         temp = string[3:end]
-        for data in temp.split(","):
-            result_list.append(data.strip())
+        result_list = list(map(lambda x: x.strip(), temp.split(",")))
     elif string[1] == "{":
         index = string.index("..")
         begin = int(string[index - 1])
-        end = int(string[index + 2])
+        end = int(string[index + 2:-1])
         result_list = list(map(lambda x: x, range(begin, end + 1)))
     else:
         raise BaseException("语法错误")
@@ -75,9 +73,3 @@ class DataNode(object):
 
     def set_column_list(self, column_list):
         self.column_list = column_list
-
-
-if __name__ == '__main__':
-    data_list = map(lambda x: x+2, [1, 2, 3, 4])
-
-    print(list(data_list))

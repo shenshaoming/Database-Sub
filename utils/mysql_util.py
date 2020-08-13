@@ -4,8 +4,8 @@ from utils.config import db_host, db_username, db_password, db_schema, db_port
 
 
 class MyConn(object):
-    def __init__(self, host=db_host, user=db_username, password=db_password,
-                 schema=db_schema, port=db_port):
+    def __init__(self, host, user, password,
+                 schema, port=3306):
         """
         :param host 数据库ip地址
         :param user 数据库连接用户名
@@ -166,31 +166,23 @@ class MyConn(object):
         self.conn.cursor().close()
         self.conn.close()
 
+    def generate_sql(self, table_name, ignore_col_set=()):
+        """
+        根据数据库中的列名生成字典格式的insert sql语句
+        :param table_name 表名称
+        :param ignore_col_set 要忽略列集合
+        :return: 生成的insert语句
+        """
 
-def generate_sql(table_name, ignore_col_set=(), conn=None):
-    """
-    根据数据库中的列名生成字典格式的sql语句
-    :param table_name 表名称
-    :param ignore_col_set 要忽略列集合
-    :param conn 数据库连接对象
-    :return: 生成的insert语句
-    """
+        sql = "show columns from %s" % table_name
+        rs = self.get_result(sql)
 
-    sql = "show columns from %s" % table_name
-
-    if conn is None:
-        conn = MyConn()
-        rs = conn.get_result(sql)
-        conn.close()
-    else:
-        rs = conn.get_result(sql)
-
-    col_list = list()
-    for row in rs:
-        if row[0] in ignore_col_set:
-            continue
-        else:
-            col_list.append(row[0])
-    sql = "INSERT INTO %s (%s) \nVALUES (" % (table_name, ", ".join(map(str, col_list)))
-    sql = "%s%s )" % (sql, ", ".join(map(lambda item: "%(" + item + ")s", col_list)))
-    return sql
+        col_list = list()
+        for row in rs:
+            if row[0] in ignore_col_set:
+                continue
+            else:
+                col_list.append(row[0])
+        sql = "INSERT INTO %s (%s) \nVALUES (" % (table_name, ", ".join(map(str, col_list)))
+        sql = "%s%s )" % (sql, ", ".join(map(lambda item: "%(" + item + ")s", col_list)))
+        return sql
