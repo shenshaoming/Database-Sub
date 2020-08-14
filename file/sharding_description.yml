@@ -1,4 +1,6 @@
+# 数据库连接配置,需要用到几个数据库就需要配置几个
 dataSources:
+#  数据库配置
   toyota2:
     idAddress: 127.0.0.1
     port: 3306
@@ -9,10 +11,12 @@ dataSources:
     port: 3306
     username: root
     password: chaojimima=123$
+# 分库分表策略
 shardingRule:
+  # 逻辑表名
   vin_detail:
     old:
-      dataNodes: toyota.vin_detail_${[1, 2, 3, 4, 5, 6]}
+      dataNodes: toyota.vin_detail_${['1', '2', '3', '4', '5', '6']}
       shardingColumn: ctlgcd_no
 
     new:

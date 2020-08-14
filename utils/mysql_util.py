@@ -1,7 +1,5 @@
 import MySQLdb
 
-from utils.config import db_host, db_username, db_password, db_schema, db_port
-
 
 class MyConn(object):
     def __init__(self, host, user, password,
@@ -107,6 +105,7 @@ class MyConn(object):
             return rows
         except Exception as e:
             if flag:
+                print(sql)
                 raise e
             else:
                 self.ping()

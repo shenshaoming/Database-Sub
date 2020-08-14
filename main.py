@@ -39,9 +39,12 @@ def get_sharding_index(key, num):
     :return: 0~num - 1
     """
 
+    # python中修改全局变量需要声明global
     global j_class
     if j_class is None:
+        # 根据全类名加载
         j_class = jpype.JClass("com.zqlh.main.JumpConsistentHash")
+    # 调用的方法名和自己定义的方法名一样
     return int(j_class.jumpConsistentHash(key, num))
 
 
@@ -163,7 +166,7 @@ def init_last_key(database, table, key_column, column_list):
     :return: table中的数据不可为空
     """
 
-    sql = "select * from %s order by %s" % (table, key_column)
+    sql = "select * from %s order by %s limit 1" % (table, key_column)
     rs = database_pool_dict[database].get_result(sql)
     data = parse_obj(rs[0], column_list)
     return data[key_column]
@@ -221,12 +224,11 @@ def data_transform(tables_dict):
                     continue
 
                 last_key = init_last_key(old_database, old_table, key_column, column_list)
-
+                select_data[2] = last_key
                 count = 0
                 select_data[0] = old_table
                 rs = database_pool_dict[old_database].get_result(select_sql % tuple(select_data))
                 while len(rs) > 0:
-                    select_data[2] = last_key
                     for row in rs:
                         data = parse_obj(row, column_list)
                         last_key = data[key_column]
@@ -241,7 +243,8 @@ def data_transform(tables_dict):
                             insert_new_data(target_database, target_table, data)
                             delete_data_by_key(data, old_database, old_table, old_dataNode.key_column)
                     count += len(rs)
-                    print("已迁移完成 %s, 还剩 %s" % (count, total - count))
+                    print("已迁移完成 %s, 还剩 %s" % (count, total - count - 1))
+                    select_data[2] = last_key
                     rs = database_pool_dict[old_database].get_result(select_sql % tuple(select_data))
                 print("%s.%s 表的数据迁移完成" % (old_database, old_table))
 
@@ -272,7 +275,8 @@ def main():
 
 if __name__ == '__main__':
     try:
-        jpype.startJVM(jpype.getDefaultJVMPath(), "-ea", "-Djava.class.path=hash/snow.jar", convertStrings=False)
+        jpype.startJVM(jpype.getDefaultJVMPath(), "-ea",
+                       "-Djava.class.path=hash/snow.jar", convertStrings=False)
         main()
         # 程序正常运行结束,通知监控程序，运行结束了
     except BaseException as e:

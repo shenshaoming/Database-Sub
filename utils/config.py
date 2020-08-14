@@ -17,14 +17,3 @@ def get_xml_value(name):
         return None
     return value.text.strip()
 
-
-tableSchema = get_xml_value("db_schema")
-db_host = get_xml_value("db_host")
-db_username = get_xml_value("db_user")
-db_password = get_xml_value("db_password")
-db_schema = get_xml_value("db_schema")
-db_port = get_xml_value("db_port")
-
-username = get_xml_value("username")
-password = get_xml_value("password")
-

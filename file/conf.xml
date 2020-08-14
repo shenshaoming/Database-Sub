@@ -1,20 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <root>
-    <db_schema>toyota2</db_schema>
-    <db_host>127.0.0.1</db_host>
-    <db_user>root</db_user>
-    <db_password>chaojimima=123$</db_password>
-    <db_port>3306</db_port>
 
-    <redis_db>1</redis_db>
-    <redis_host>127.0.0.1</redis_host>
-    <redis_port>6379</redis_port>
-    <redis_password>123456</redis_password>
-
-    <!-- 图片存储路径 -->
-    <image_location>图片存储路径</image_location>
-
-    <!-- 登录用的账号密码 -->
-    <username>username</username>
-	<password>password</password>
 </root>
