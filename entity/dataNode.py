@@ -21,10 +21,12 @@ def get_sharding_list(string):
 
 
 class DataNode(object):
-    def __init__(self, data_obj, table_logic_name, sharding_column):
+    def __init__(self, data_obj, table_logic_name, sharding_column, key_column):
         """
         :param data_obj: table_name_base所对应的dict
         :param table_logic_name: 逻辑表名
+        :param sharding_column: 分片键
+        :param key_column: 主键列
         """
 
         data_nodes = str(data_obj["dataNodes"])
@@ -55,6 +57,7 @@ class DataNode(object):
         self.table_suffix_list = table_suffix_list
         self.database_suffix_list = database_suffix_list
         self.sharding_column = sharding_column
+        self.key_column = key_column
 
     def get_database_list(self):
         temp_list = []
@@ -67,9 +70,3 @@ class DataNode(object):
         for table_suffix in self.table_suffix_list:
             temp_list.append('%s%s' % (self.table_basename, table_suffix))
         return temp_list
-
-    def get_column_list(self):
-        return self.column_list
-
-    def set_column_list(self, column_list):
-        self.column_list = column_list

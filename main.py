@@ -22,8 +22,10 @@ def parse_yaml(sharding_yaml):
     for table_name_base in sharding_yaml["shardingRule"]:
         temp = sharding_yaml["shardingRule"][table_name_base]
         result_dict[table_name_base] = {
-            "old": DataNode(temp["old"], table_name_base, temp["old"]["shardingColumn"]),
-            "new": DataNode(temp["new"], table_name_base, temp["new"]["shardingColumn"])
+            "old": DataNode(temp["old"], table_name_base,
+                            temp["old"]["shardingColumn"], temp["keyGeneratorColumn"]),
+            "new": DataNode(temp["new"], table_name_base,
+                            temp["new"]["shardingColumn"], temp["keyGeneratorColumn"])
         }
 
     return result_dict
@@ -114,15 +116,73 @@ def calculate_sharding(data, database_sharding_column, table_sharding_column, da
                               database_num), get_sharding_index(data[table_sharding_column], table_num)
 
 
+# 数据库插入操作的sql语句
+insert_sql_cache = {}
+
+
+def insert_new_data(database, table, data):
+    """
+    插入数据到{database}.{table}中
+    :param database: 数据库名
+    :param table: 表名
+    :param data: 待插入的对象
+    :return: None
+    """
+
+    conn = database_pool_dict[database]
+
+    if table in insert_sql_cache.keys():
+        sql = insert_sql_cache[table]
+    else:
+        sql = conn.generate_sql(table)
+        insert_sql_cache[table] = sql
+    conn.exec_sql_data(sql, data)
+
+
+def delete_data_by_key(data, database, table, key_column):
+    """
+    通过#{key_column}删除数据
+    :param data: data_dict对象
+    :param database: 数据库
+    :param table: 表名
+    :param key_column: 逐渐列
+    :return: None
+    """
+
+    sql = "delete from %s where %s = '%s'" % (table, key_column, data[key_column])
+    database_pool_dict[database].exec_sql(sql)
+
+
+def init_last_key(database, table, key_column, column_list):
+    """
+    初始化用于last_key
+    :param database: 数据库
+    :param table: 表名
+    :param key_column: 主键列
+    :param column_list: 数据库列描述的list
+    :return: table中的数据不可为空
+    """
+
+    sql = "select * from %s order by %s" % (table, key_column)
+    rs = database_pool_dict[database].get_result(sql)
+    data = parse_obj(rs[0], column_list)
+    return data[key_column]
+
+
 def data_transform(tables_dict):
     """
     数据迁移
     :return:
     """
 
-    sql = "select * from %s limit %d"
+    # 按照主键排序搜索,
+    select_sql = "select * from %s where %s > '%s' limit %d order by %s"
+    # 分页条数
+    size = 3000
+    select_data = ["table_name", "key_column", "last_key", size, "key_column"]
 
     for logic_table_name in tables_dict:
+
         old_dataNode = tables_dict[logic_table_name]["old"]
         new_dataNode = tables_dict[logic_table_name]["new"]
 
@@ -130,31 +190,61 @@ def data_transform(tables_dict):
         new_database_list = new_dataNode.get_database_list()
         old_table_list = old_dataNode.get_table_list()
         new_table_list = new_dataNode.get_table_list()
+        # 数据库逻辑主键
+        key_column = old_dataNode.key_column
+        select_data[1] = select_data[4] = key_column
 
-        # 获得表中所有列的描述信息
-        rs, column_list = database_pool_dict[old_database_list[0]] \
-            .get_rs_with_describe(sql % (old_table_list[0], 1))
-        rs = database_pool_dict[old_database_list[0]].get_result("show create table %s" % old_table_list[0])
+        rs = database_pool_dict[old_database_list[0]]\
+            .get_result("show create table %s" % old_table_list[0])
         if len(rs) < 1:
             raise TableNotFoundException(old_database_list[0], old_table_list[0])
         else:
+            # 获取创建表的sql语句
             table_sql = format_table_sql(rs[0][1], old_table_list[0])
+
+        # 获取数据库中列的描述信息
+        describe_sql = "select * from %s limit 1 order by %s" % (old_table_list[0], key_column)
+        # 获得表中所有列的描述信息
+        rs, column_list = database_pool_dict[old_database_list[0]] \
+            .get_rs_with_describe(describe_sql)
+
         for new_database in new_database_list:
             for new_table in new_table_list:
                 check_table_exist(new_database, new_table, table_sql)
 
         for old_database in old_database_list:
             for old_table in old_table_list:
-                rs = database_pool_dict[old_database].get_result(sql % (old_table, 1))
-                for row in rs:
-                    data = parse_obj(row, column_list)
-                    # 计算分片index
-                    target_database_index, target_table_index = \
-                        calculate_sharding(data, old_dataNode.sharding_column, new_dataNode.sharding_column,
-                                           len(new_database_list), len(new_table_list))
-                    target_database = new_database_list[target_database_index]
-                    target_table = new_table_list[target_table_index]
-                    print("%s.%s => %s.%s" % (old_database, old_table, target_database, target_table))
+
+                total = database_pool_dict[old_database].get_result("select count(1) from %s" % old_table)
+                if total < 1:
+                    print("%s.%s 中数据为空" % (old_database, old_table))
+                    continue
+
+                last_key = init_last_key(old_database, old_table, key_column, column_list)
+
+                count = 0
+                select_data[0] = old_table
+                rs = database_pool_dict[old_database].get_result(select_sql % tuple(select_data))
+                while len(rs) > 0:
+                    select_data[2] = last_key
+                    for row in rs:
+                        data = parse_obj(row, column_list)
+                        last_key = data[key_column]
+                        # 计算分片index
+                        target_database_index, target_table_index = \
+                            calculate_sharding(data, old_dataNode.sharding_column, new_dataNode.sharding_column,
+                                               len(new_database_list), len(new_table_list))
+                        target_database = new_database_list[target_database_index]
+                        target_table = new_table_list[target_table_index]
+                        if old_database != target_database or old_table != target_table:
+                            # 数据有移动, 插入数据到新表中,并且删除当前行
+                            insert_new_data(target_database, target_table, data)
+                            delete_data_by_key(data, old_database, old_table, old_dataNode.key_column)
+                            print("%s.%s => %s.%s" % (old_database, old_table, target_database, target_table))
+                    count += len(rs)
+                    print("已迁移完成 %s, 还剩 %s" % (count, total - count))
+                    rs = database_pool_dict[old_database].get_result(select_sql % tuple(select_data))
+                print("%s.%s 表的数据迁移完成" % (old_database, old_table))
 
 
 def main():

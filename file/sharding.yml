@@ -18,3 +18,4 @@ shardingRule:
     new:
       dataNodes: toyota.car_detail_${1..6}
       shardingColumn: frame_no
+    keyGeneratorColumn: id
