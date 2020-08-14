@@ -51,7 +51,7 @@ class DataNode(object):
         if len(temp) > 1:
             table_suffix_list = get_sharding_list('$%s' % temp[1])
         else:
-            table_suffix_list = []
+            table_suffix_list = ['']
         self.table_basename = "%s%s" % (table_logic_name, temp[0])
         self.database_basename = database_basename
         self.table_suffix_list = table_suffix_list

@@ -130,6 +130,7 @@ class MyConn(object):
             return rows, description
         except Exception as e:
             if flag:
+                print(sql)
                 raise e
             else:
                 self.ping()

@@ -10,12 +10,12 @@ dataSources:
     username: root
     password: chaojimima=123$
 shardingRule:
-  car_detail:
+  vin_detail:
     old:
-      dataNodes: toyota2.car_detail_${1..16}
-      shardingColumn: frame_no
+      dataNodes: toyota.vin_detail
+      shardingColumn: ctlgcd_no
 
     new:
-      dataNodes: toyota.car_detail_${1..6}
-      shardingColumn: frame_no
+      dataNodes: toyota.vin_detail_${1..6}
+      shardingColumn: ctlgcd_no
     keyGeneratorColumn: id

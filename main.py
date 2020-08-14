@@ -176,10 +176,10 @@ def data_transform(tables_dict):
     """
 
     # 按照主键排序搜索,
-    select_sql = "select * from %s where %s > '%s' limit %d order by %s"
+    select_sql = "select * from %s where %s > '%s' order by %s limit %d"
     # 分页条数
     size = 3000
-    select_data = ["table_name", "key_column", "last_key", size, "key_column"]
+    select_data = ["table_name", "key_column", "last_key", "key_column", size]
 
     for logic_table_name in tables_dict:
 
@@ -192,7 +192,7 @@ def data_transform(tables_dict):
         new_table_list = new_dataNode.get_table_list()
         # 数据库逻辑主键
         key_column = old_dataNode.key_column
-        select_data[1] = select_data[4] = key_column
+        select_data[1] = select_data[3] = key_column
 
         rs = database_pool_dict[old_database_list[0]]\
             .get_result("show create table %s" % old_table_list[0])
@@ -203,7 +203,7 @@ def data_transform(tables_dict):
             table_sql = format_table_sql(rs[0][1], old_table_list[0])
 
         # 获取数据库中列的描述信息
-        describe_sql = "select * from %s limit 1 order by %s" % (old_table_list[0], key_column)
+        describe_sql = "select * from %s order by %s limit 1" % (old_table_list[0], key_column)
         # 获得表中所有列的描述信息
         rs, column_list = database_pool_dict[old_database_list[0]] \
             .get_rs_with_describe(describe_sql)
@@ -215,7 +215,7 @@ def data_transform(tables_dict):
         for old_database in old_database_list:
             for old_table in old_table_list:
 
-                total = database_pool_dict[old_database].get_result("select count(1) from %s" % old_table)
+                total = database_pool_dict[old_database].get_result("select count(1) from %s" % old_table)[0][0]
                 if total < 1:
                     print("%s.%s 中数据为空" % (old_database, old_table))
                     continue
@@ -240,7 +240,6 @@ def data_transform(tables_dict):
                             # 数据有移动, 插入数据到新表中,并且删除当前行
                             insert_new_data(target_database, target_table, data)
                             delete_data_by_key(data, old_database, old_table, old_dataNode.key_column)
-                            print("%s.%s => %s.%s" % (old_database, old_table, target_database, target_table))
                     count += len(rs)
                     print("已迁移完成 %s, 还剩 %s" % (count, total - count))
                     rs = database_pool_dict[old_database].get_result(select_sql % tuple(select_data))
