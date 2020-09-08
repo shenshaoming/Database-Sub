@@ -1,3 +1,4 @@
+import MySQLdb
 import jpype
 import yaml
 
@@ -172,6 +173,39 @@ def init_last_key(database, table, key_column, column_list):
     return data[key_column]
 
 
+def data_move(data, new_database, new_table, old_database, old_table, key_column):
+    """
+    数据迁移，且使用事务
+    :param data: 待操作的数据对象
+    :param new_database: 新数据库
+    :param new_table: 新表
+    :param old_database: 旧数据库
+    :param old_table: 就表
+    :param key_column: 主键列的名称
+    :return: None
+    """
+    if old_database != new_database or old_table != new_table:
+        new_conn = database_pool_dict[new_database].ping()
+        old_conn = database_pool_dict[old_database].ping()
+        if new_table in insert_sql_cache.keys():
+            insert_sql = insert_sql_cache[new_table]
+        else:
+            insert_sql = new_conn.generate_sql(new_table)
+            insert_sql_cache[new_table] = insert_sql
+        delete_sql = "delete from %s where %s = '%s'" % (old_table, key_column, data[key_column])
+
+        try:
+            new_cursor = new_conn.cursor()
+            old_cursor = old_conn.cursor()
+            new_cursor.execute(insert_sql)
+            old_cursor.execute(delete_sql)
+            new_conn.commit()
+            old_conn.commit()
+        except BaseException:
+            new_conn.rollback()
+            old_conn.rollback()
+
+
 def data_transform(tables_dict):
     """
     数据迁移
@@ -240,8 +274,8 @@ def data_transform(tables_dict):
                         target_table = new_table_list[target_table_index]
                         if old_database != target_database or old_table != target_table:
                             # 数据有移动, 插入数据到新表中,并且删除当前行
-                            insert_new_data(target_database, target_table, data)
-                            delete_data_by_key(data, old_database, old_table, old_dataNode.key_column)
+                            data_move(data, target_database, target_table, old_database, old_table,
+                                      old_dataNode.key_column)
                     count += len(rs)
                     print("已迁移完成 %s, 还剩 %s" % (count, total - count - 1))
                     select_data[2] = last_key
